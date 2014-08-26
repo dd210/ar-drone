@@ -23,7 +23,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="ar_drone.py" />
+    <Compile Include="drone_movement.py" />
     <Compile Include="libardrone.py" />
+    <Compile Include="video_processing.py" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

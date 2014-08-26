@@ -6,7 +6,7 @@ Autopilot for AR Drone
 import pygame
 import libardrone
 import cv2
-import numpy
+import numpy as np
 import image
 import socket
 import threading
@@ -15,6 +15,8 @@ import multiprocessing
 import time
 import thread
 import Queue
+import video_processing
+import drone_movement
 
 #MK_special function for converting images from OpenCV format to pygame format
 def cvimage_to_pygame(image):
@@ -49,6 +51,29 @@ class reading_video_data:
                 frame = frames
             out.put(frame)
         return
+
+#MK_cross
+class reading_cross_data:
+    def __init__(self):
+        self._running = True         
+    def terminate(self):
+        self._running = False   
+    def run(self, out1, out2):
+        while self._running:
+            if out1.full():
+                image = out1.get()
+                cross = video_processing.Frame_processing(image)   
+                state, coords, int_image = cross.cross_detection()
+                data_cross = [state, coords, int_image]
+                if out2.full():
+                    out2.get()
+                    out2.put(data_cross)
+                else:
+                    out2.put(data_cross)
+                #time.sleep(0.1)
+                cross.kill()
+                #out2.put(coords)                
+        return
     
 def main():         
     #MK_initiation of pygame, setting display
@@ -80,7 +105,15 @@ def main():
     #MK_launching threads
     nav_thread.start()
     video_thread.start()
-    time.sleep(0.2)    
+    time.sleep(0.2)   
+    
+    #MK_cross
+    q_cross_out = Queue.Queue(1)
+    q_cross_in = Queue.Queue(1)
+    cross_data = reading_cross_data()
+    cross_thread = threading.Thread(target = cross_data.run, args = (q_cross_in, q_cross_out))
+    cross_thread.start()
+     
     #MK_timer
     time1 = time.clock()
     #MK_integrated trajectory
@@ -94,9 +127,62 @@ def main():
     time4 = 0.0
     running = True
     #MK_counters
+    cross_program = False
     frame_counter = 0
+    frame_cross_counter = 0
+    cross_state = [False, [0,0]]
+    cross_past_states = []
+    cross_past_states_x = []
+    cross_past_states_y = []
+    detected_frames = 3
+    detected_frames_threshold = 2
+    stdev_threshold = 500.0
+    freq_video_processing = 5
     while running:
         frame_counter += 1
+
+        #MK_cross
+        if q_cross_out.full():  
+            cross_program = False       
+            cross_state = q_cross_out.get()
+            frame_cross_counter += 1
+            #cross_past_states [frame_cross_counter % 25] = cross_state[0]            
+            #print cross_state[0]
+            if  frame_cross_counter < detected_frames and cross_program == False:
+                cross_past_states.append(int(cross_state[0]))
+                cross_past_states_x.append(int(cross_state[1][0]))
+                cross_past_states_y.append(int(cross_state[1][1]))
+                deviation_x = np.std(cross_past_states_x)
+                deviation_y = np.std(cross_past_states_y)
+            elif frame_cross_counter >= detected_frames and cross_program == False:
+                cross_past_states.pop(0)
+                cross_past_states.append(int(cross_state[0]))
+                cross_past_states_x.pop(0)
+                cross_past_states_x.append(int(cross_state[1][0]))
+                deviation_x = np.std(cross_past_states_x)
+                cross_past_states_y.pop(0)
+                cross_past_states_y.append(int(cross_state[1][1]))
+                deviation_y = np.std(cross_past_states_y)
+                #print cross_past_states,(deviation_x + deviation_y)
+            if sum(cross_past_states) >= detected_frames_threshold and deviation_x + deviation_y <= stdev_threshold:
+                cross_program = True
+                cross_x = np.median(cross_past_states_x)
+                cross_y = np.median(cross_past_states_y)
+            if cross_program == True:
+                angle_hor, angle_ver, length = drone_movement.image_point(cross_x, cross_y, drone.altitude)
+                drone.speed = 0.15 * (abs(cross_x - 640.0)/640.0)**2
+                #print angle_hor, cross_x, cross_y
+                if angle_hor < 0:
+                    drone.move_left()
+                    pass
+                else:
+                    drone.move_right()
+                    pass
+            else:
+                drone.hover()
+                pass               
+        #MK_end of cross    
+
         #MK_reading video and navigation data from queue
         try:
 
@@ -105,6 +191,9 @@ def main():
             time3 = time.clock()
             if q_vid.full():                               
                 frame = q_vid.get() 
+                frame_1 = frame.copy() 
+                if frame_counter % freq_video_processing == 0:
+                    q_cross_in.put(frame_1)  
                 if time3 - time4 > 0.5:
                     video_processing_time = time3 - time4   
                     print video_processing_time,"_____", frame_counter,"_____", time3             
@@ -115,6 +204,9 @@ def main():
             vx_state = 0.001 * nav_info[0]['vx']
             vy_state = 0.001 * nav_info[0]['vy']
             vz_state = 0.001 * nav_info[0]['vz']
+            phi_state = nav_info[0]['phi']
+            psi_state = nav_info[0]['psi']
+            theta_state = nav_info[0]['theta']
         except:
             pass
         #MK_printing navigation state               
@@ -125,6 +217,11 @@ def main():
         str_vz = "z-velocity: " + str(vz_state)
         str_S = "integrated way: " + str(S)
         str_time = "time: " + str(time1)
+        str_phi = "phi: " + str(phi_state)
+        str_psi = "psi: " + str(psi_state)
+        str_theta = "theta: " + str(theta_state)
+        str_cross = "cross identification: " + str(cross_program)
+        str_frames = "frame_cross_counter: " + str(frame_cross_counter)
         frame_0 = frame.copy()
         cv2.putText(frame,str(str_battery),(20,20), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
         cv2.putText(frame,str(str_altitude),(20,40), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))        
@@ -132,7 +229,13 @@ def main():
         cv2.putText(frame,str(str_vy),(20,80), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
         cv2.putText(frame,str(str_vz),(20,100), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
         cv2.putText(frame,str(str_S),(20,120), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
-        cv2.putText(frame,str(str_time),(20,140), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))                              
+        cv2.putText(frame,str(str_time),(20,140), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))   
+        cv2.putText(frame,str(str_phi),(20,160), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
+        cv2.putText(frame,str(str_psi),(20,180), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
+        cv2.putText(frame,str(str_theta),(20,200), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))                             
+        cv2.putText(frame,str(str_cross),(20,220), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))                    
+        cv2.putText(frame,str(str_frames),(20,240), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))              
+        cv2.circle(frame, (cross_state[1][0], cross_state[1][1]), 10, (255, 0, 0), -1)                                          
         pygame_img = cvimage_to_pygame(frame)
         #MK_Putting captured frame on the screen and update (that's two consequent actions)
         screen.blit(pygame_img,(0,0))
