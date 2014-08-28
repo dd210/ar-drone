@@ -47,9 +47,12 @@ class reading_video_data:
     def run(self, out, video_ch):
         while video_ch.isOpened():
             #MK_capturing the very last frame from buffer that may contain few images
-            for frames in video_ch.read():
-                frame = frames
-            out.put(frame)
+            #for frames in video_ch.read():
+            #    frame = frames
+            frame = video_ch.read()
+            frame2 = frame[1]
+            out.put(frame2)
+            #print "1"
         return
 
 #MK_cross
@@ -83,7 +86,7 @@ def main():
     screen = pygame.display.set_mode((W, H))
     #MK_creating AR Drone object (described in libardrone library)    
     drone = libardrone.ARDrone()
-    time.sleep(1)
+
     #MK_capturing video - creating connection by OpenCV tools  
     cap = cv2.VideoCapture("tcp://192.168.1.1:5555")
     if cap.isOpened():
@@ -137,10 +140,23 @@ def main():
     detected_frames = 3
     detected_frames_threshold = 2
     stdev_threshold = 500.0
-    freq_video_processing = 5
+    freq_video_processing = 2
+    time.sleep(1)
+    str_battery = "battery level: " + str("")
+    str_altitude = "altitude: " + str("")        
+    str_vx = "x-velocity: " + str("")
+    str_vy = "y-velocity: " + str("")
+    str_vz = "z-velocity: " + str("")
+    str_S = "integrated way: " + str("")
+    str_time = "time: " + str("")
+    str_phi = "phi: " + str("")
+    str_psi = "psi: " + str("")
+    str_theta = "theta: " + str("")
+    str_cross = "cross identification: " + str("")
+    str_frames = "frame_cross_counter: " + str("")
+    frame = np.zeros((H, W, 3), np.uint8)
     while running:
         frame_counter += 1
-
         #MK_cross
         if q_cross_out.full():  
             cross_program = False       
@@ -184,45 +200,47 @@ def main():
         #MK_end of cross    
 
         #MK_reading video and navigation data from queue
-        try:
-
-            if q_nav.full():
+        if q_nav.full():
+            try:
                 nav_info = q_nav.get()
-            time3 = time.clock()
-            if q_vid.full():                               
-                frame = q_vid.get() 
-                frame_1 = frame.copy() 
-                if frame_counter % freq_video_processing == 0:
-                    q_cross_in.put(frame_1)  
-                if time3 - time4 > 0.5:
-                    video_processing_time = time3 - time4   
-                    print video_processing_time,"_____", frame_counter,"_____", time3             
-                time4 = time.clock()   
-            nav_info = libardrone.decode_navdata(nav_info)
-            battery_state = nav_info[0]['battery']
-            altitude_state = 0.001 * nav_info[0]['altitude'] 
-            vx_state = 0.001 * nav_info[0]['vx']
-            vy_state = 0.001 * nav_info[0]['vy']
-            vz_state = 0.001 * nav_info[0]['vz']
-            phi_state = nav_info[0]['phi']
-            psi_state = nav_info[0]['psi']
-            theta_state = nav_info[0]['theta']
-        except:
-            pass
-        #MK_printing navigation state               
-        str_battery = "battery level: " + str(battery_state)
-        str_altitude = "altitude: " + str(altitude_state)        
-        str_vx = "x-velocity: " + str(vx_state)
-        str_vy = "y-velocity: " + str(vy_state)
-        str_vz = "z-velocity: " + str(vz_state)
-        str_S = "integrated way: " + str(S)
-        str_time = "time: " + str(time1)
-        str_phi = "phi: " + str(phi_state)
-        str_psi = "psi: " + str(psi_state)
-        str_theta = "theta: " + str(theta_state)
-        str_cross = "cross identification: " + str(cross_program)
-        str_frames = "frame_cross_counter: " + str(frame_cross_counter)
-        frame_0 = frame.copy()
+                nav_info = libardrone.decode_navdata(nav_info)
+                #print nav_info
+                battery_state = nav_info[0]['battery']
+                altitude_state = 0.001 * nav_info[0]['altitude'] 
+                vx_state = 0.001 * nav_info[0]['vx']
+                vy_state = 0.001 * nav_info[0]['vy']
+                vz_state = 0.001 * nav_info[0]['vz']
+                phi_state = nav_info[0]['phi']
+                psi_state = nav_info[0]['psi']
+                theta_state = nav_info[0]['theta']
+                #MK_printing navigation state               
+                str_battery = "battery level: " + str(battery_state)
+                str_altitude = "altitude: " + str(altitude_state)        
+                str_vx = "x-velocity: " + str(vx_state)
+                str_vy = "y-velocity: " + str(vy_state)
+                str_vz = "z-velocity: " + str(vz_state)
+                str_S = "integrated way: " + str(S)
+                str_time = "time: " + str(time1)
+                str_phi = "phi: " + str(phi_state)
+                str_psi = "psi: " + str(psi_state)
+                str_theta = "theta: " + str(theta_state)
+                str_cross = "cross identification: " + str(cross_program)
+                str_frames = "frame_cross_counter: " + str(frame_cross_counter)
+            except:
+                print "Fail to decode nav_data.."
+
+        time3 = time.clock()
+        if q_vid.full() and frame_counter > 5:                               
+            frame = q_vid.get() 
+            frame_0 = frame.copy()
+            frame_1 = frame.copy() 
+            if frame_counter % freq_video_processing == 0:
+                q_cross_in.put(frame_1)  
+            if time3 - time4 > 0.5:
+                video_processing_time = time3 - time4   
+                print video_processing_time,"_____", frame_counter,"_____", time3             
+            time4 = time.clock()   
+
         cv2.putText(frame,str(str_battery),(20,20), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
         cv2.putText(frame,str(str_altitude),(20,40), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))        
         cv2.putText(frame,str(str_vx),(20,60), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
