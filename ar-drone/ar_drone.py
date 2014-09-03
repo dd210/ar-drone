@@ -140,7 +140,7 @@ def main():
     detected_frames = 3
     detected_frames_threshold = 2
     stdev_threshold = 500.0
-    freq_video_processing = 2
+    freq_video_processing = 1
     time.sleep(1)
     str_battery = "battery level: " + str("")
     str_altitude = "altitude: " + str("")        
