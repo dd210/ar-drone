@@ -63,6 +63,7 @@ class reading_cross_data:
         self._running = False   
     def run(self, out1, out2):
         while self._running:
+            time.sleep(0.01)   #magic line - eliminate freezes
             if out1.full():
                 image = out1.get()
                 cross = video_processing.Frame_processing(image)   
@@ -140,7 +141,7 @@ def main():
     detected_frames = 3
     detected_frames_threshold = 2
     stdev_threshold = 500.0
-    freq_video_processing = 1
+    freq_video_processing = 2
     time.sleep(1)
     str_battery = "battery level: " + str("")
     str_altitude = "altitude: " + str("")        
