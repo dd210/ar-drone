@@ -31,15 +31,18 @@ class reading_nav_data:
     def run(self, out, socket):
         while self._running:
             try:
+                #magic line - eliminate freezes
+                time.sleep(0.001)   
                 data = socket.recv(65535)
-                out.put(data)                
+                if out.full() != True:
+                    out.put(data)             
             except socket.timeout(0.025):
                 continue
         return
 
-    def decode(self, q_nav, frame, s, time1, time2, cross_program, frame_cross_counter):
+    def decode(self, q_nav, frame, s, time1, time2, cross_program, frame_cross_counter, cross_state):
         #MK_default nav data
-        cross_state = [False, [0,0]]
+        #cross_state = [False, [0,0]]
         cross_past_states = []
         cross_past_states_x = []
         cross_past_states_y = []
@@ -55,34 +58,34 @@ class reading_nav_data:
         str_theta = "theta: " + str("")
         str_cross = "cross identification: " + str("")
         str_frames = "frame_cross_counter: " + str("")
-        try:
+        if q_nav.full():
             nav_info = q_nav.get()
             nav_info = libardrone.decode_navdata(nav_info)
-            #print nav_info
-            battery_state = nav_info[0]['battery']
-            altitude_state = 0.001 * nav_info[0]['altitude'] 
-            vx_state = 0.001 * nav_info[0]['vx']
-            vy_state = 0.001 * nav_info[0]['vy']
-            vz_state = 0.001 * nav_info[0]['vz']
-            phi_state = nav_info[0]['phi']
-            psi_state = nav_info[0]['psi']
-            theta_state = nav_info[0]['theta']
-            s = s + (((time2 - time1)*vx_state)**2 + ((time2 - time1)*vy_state)**2)**0.5
-            #MK_printing navigation state                                        
-            str_battery = "battery level: " + str(battery_state)
-            str_altitude = "altitude: " + str(altitude_state)        
-            str_vx = "x-velocity: " + str(vx_state)
-            str_vy = "y-velocity: " + str(vy_state)
-            str_vz = "z-velocity: " + str(vz_state)
-            str_s = "integrated way: " + str(s)
-            str_time = "time: " + str(time1)
-            str_phi = "phi: " + str(phi_state)
-            str_psi = "psi: " + str(psi_state)
-            str_theta = "theta: " + str(theta_state)                
-            str_cross = "cross identification: " + str(cross_program)
-            str_frames = "frame_cross_counter: " + str(frame_cross_counter)
-        except:
-            print "Fail to decode nav_data.."
+            try:
+                battery_state = nav_info[0]['battery']
+                altitude_state = 0.001 * nav_info[0]['altitude'] 
+                vx_state = 0.001 * nav_info[0]['vx']
+                vy_state = 0.001 * nav_info[0]['vy']
+                vz_state = 0.001 * nav_info[0]['vz']
+                phi_state = nav_info[0]['phi']
+                psi_state = nav_info[0]['psi']
+                theta_state = nav_info[0]['theta']
+                s = s + (((time2 - time1)*vx_state)**2 + ((time2 - time1)*vy_state)**2)**0.5
+                #MK_printing navigation state                                        
+                str_battery = "battery level: " + str(battery_state)
+                str_altitude = "altitude: " + str(altitude_state)        
+                str_vx = "x-velocity: " + str(vx_state)
+                str_vy = "y-velocity: " + str(vy_state)
+                str_vz = "z-velocity: " + str(vz_state)
+                str_s = "integrated way: " + str(s)
+                str_time = "time: " + str(time1)
+                str_phi = "phi: " + str(phi_state)
+                str_psi = "psi: " + str(psi_state)
+                str_theta = "theta: " + str(theta_state)                
+                str_cross = "cross identification: " + str(cross_program)
+                str_frames = "frame_cross_counter: " + str(frame_cross_counter)
+            except:
+                print "Fail to decode nav_data.."
         cv2.putText(frame,str(str_battery),(20,20), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
         cv2.putText(frame,str(str_altitude),(20,40), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))        
         cv2.putText(frame,str(str_vx),(20,60), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
@@ -94,7 +97,8 @@ class reading_nav_data:
         cv2.putText(frame,str(str_psi),(20,180), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))
         cv2.putText(frame,str(str_theta),(20,200), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))                             
         cv2.putText(frame,str(str_cross),(20,220), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))                    
-        cv2.putText(frame,str(str_frames),(20,240), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))              
+        cv2.putText(frame,str(str_frames),(20,240), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))  
+        #print cross_state[1][0],cross_state[1][1]             
         cv2.circle(frame, (cross_state[1][0], cross_state[1][1]), 10, (255, 0, 0), -1)  
         return frame, s
 
@@ -106,25 +110,36 @@ class reading_video_data:
     def terminate(self):
         self._running = False   
 
-    def run(self, out, video_ch):
+    def run(self, out, video_ch, drone):
         while video_ch.isOpened():
-            #MK_capturing the very last frame from buffer that may contain few images
-            #for frames in video_ch.read():
-            frame = video_ch.read()
-            frame2 = frame[1]
-            out.put(frame2)
+            try:
+                #MK_capturing the very last frame from buffer that may contain few images
+                #for frames in video_ch.read():
+                #magic line - eliminate freezes
+                time.sleep(0.001)   
+                frame = video_ch.read()
+                #print "f", frame
+                frame2 = frame[1]
+                drone.image = frame2
+                if out.full() != True:
+                    out.put(frame2)
+            except socket.timeout(0.025):
+                continue
         return
 
     def decode(self, q_vid, frame, frame_0, frame_1, frame_counter, timer, time_vid_proc_1):
-        if q_vid.full() and frame_counter > 5:                               
+        state = False
+        if q_vid.full() and frame_counter > 5:   
+            #print  q_vid.get() 
+            state = True                           
             frame = q_vid.get() 
             frame_0 = frame.copy()
             frame_1 = frame.copy() 
             if timer - time_vid_proc_1 > 0.5:
                 video_processing_time = timer - time_vid_proc_1
                 print "delay in video processing:", video_processing_time, "; number of frame:", frame_counter, "; time:", timer
-            time_vid_proc_1 = timer
-        return frame, frame_0, frame_1, time_vid_proc_1 
+        time_vid_proc_1 = timer
+        return frame, frame_0, frame_1, time_vid_proc_1, state 
 
     #MK_special function for converting images from OpenCV format to pygame format
     def cvimage_to_pygame(self, image):
@@ -138,22 +153,28 @@ class reading_cross_data:
         self._running = True         
     def terminate(self):
         self._running = False   
-    def run(self, out1, out2):
+    def run(self, out1, out2, drone):
         while self._running:
             #magic line - eliminate freezes
-            time.sleep(0.025)   
+            time.sleep(0.001)   
             if out1.full():
                 image = out1.get()
+                #cv2.imwrite("image_cross.jpg", image)
+                #cv2.imshow("image from drone", image)
                 cross = video_processing.Frame_processing(image)   
-                state, coords, int_image = cross.cross_detection()
-                data_cross = [state, coords, int_image]
+                state, coords = cross.cross_detection()                
+                data_cross = [state, coords]
                 if out2.full():
                     out2.get()
                     out2.put(data_cross)
                 else:
                     out2.put(data_cross)
+                if data_cross[0] == 0:
+                    drone.data_cross = [0,[640,400]]
+                else:
+                    drone.data_cross = data_cross
                 cross.kill()          
-        return
+        return 
    
 def main():         
     #MK_initiation of pygame, setting display
@@ -161,8 +182,9 @@ def main():
     W, H = 1280, 720
     clock = pygame.time.Clock()    
     screen = pygame.display.set_mode((W, H))
+    img_init = np.zeros((H, W, 3), np.uint8)
     #MK_creating AR Drone object (described in libardrone library)    
-    drone = libardrone.ARDrone() 
+    drone = libardrone.ARDrone(img_init) 
     #MK_capturing video - creating connection by OpenCV tools  
     cap = cv2.VideoCapture("tcp://192.168.1.1:5555")
     if cap.isOpened():
@@ -172,22 +194,22 @@ def main():
     #MK_sending msg to the Drone in order to start receive messages
     nav_socket.sendto("\x01\x00\x00\x00", ('192.168.1.1', 5554))
     #MK_creating queue for threads (nav and video)
-    q_nav = Queue.Queue(2)
-    q_vid = Queue.Queue(2)
+    q_nav = Queue.Queue(1)
+    q_vid = Queue.Queue(1)
     #MK_creating threads
     nav_data = reading_nav_data()
     video_data = reading_video_data()
     nav_thread = threading.Thread(target = nav_data.run, args = (q_nav, nav_socket))
-    video_thread = threading.Thread(target = video_data.run, args = (q_vid, cap))
+    video_thread = threading.Thread(target = video_data.run, args = (q_vid, cap, drone))
     #MK_launching threads
     nav_thread.start()
     video_thread.start()
-    time.sleep(0.1)       
+    time.sleep(0.001)       
     #MK_cross - creating queue
     q_cross_out = Queue.Queue(1)
     q_cross_in = Queue.Queue(1)
     cross_data = reading_cross_data()
-    cross_thread = threading.Thread(target = cross_data.run, args = (q_cross_in, q_cross_out))
+    cross_thread = threading.Thread(target = cross_data.run, args = (q_cross_in, q_cross_out, drone))
     cross_thread.start()     
     #MK_counters and initialization
     s = 0.0
@@ -211,10 +233,12 @@ def main():
         frame_counter += 1
         #MK_reading video data from queue      
         timer = time.clock() 
-        frame, frame_0, frame_1, time_vid_proc_1  = video_data.decode(q_vid, frame, frame_0, frame_1, frame_counter, timer, time_vid_proc_1)           
+        state = False
+        frame, frame_0, frame_1, time_vid_proc_1, state  = video_data.decode(q_vid, frame, frame_0, frame_1, frame_counter, timer, time_vid_proc_1)            
         #MK_reading navigation data from queue and calculating integrated trajectory
         time2 = time.clock()
-        frame, s = nav_data.decode(q_nav, frame, s, time1, time2, cross_program, frame_cross_counter)  
+        frame, s = nav_data.decode(q_nav, frame, s, time1, time2, cross_program, frame_cross_counter, drone.data_cross)  
+        #print "cross", drone.data_cross
         time1 = time.clock()      
         #decoding image to pygame format and putting captured frame on the screen and update (that's two consequent actions)                              
         pygame_img = video_data.cvimage_to_pygame(frame)
@@ -223,8 +247,17 @@ def main():
         clock.tick(50)
         pygame.display.set_caption("FPS: %.2f" % clock.get_fps())     
 
+
+
+        #*********************AUTOPILOT PART************************
+        freq = 5
+        if frame_counter % freq == 0 and state == True:
+            q_cross_in.put(frame_1) 
+
+
+        last_command = drone_pilot.command
         temp_state = drone_pilot.state
-        drone_pilot.update_state()          
+        drone_pilot.update_state(drone)          
         lines, columns = states.shape
         if temp_state == drone_pilot.state and lines > 1:            
             states[lines-1, 1] =  s - states[0:lines-1, 1].sum()
@@ -238,20 +271,28 @@ def main():
         pilot.autopilot.number = states[lines-1, 0]
         pilot.autopilot.s_stage = states[lines-1, 1]
         pilot.autopilot.timer_stage = states[lines-1, 2]
- 
-        if drone_pilot.command == "drone.takeoff":
-            drone.takeoff()
-        elif drone_pilot.command == "drone.hover":
-            drone.hover()
-        elif drone_pilot.command == "drone.land":
-            drone.land()
-        elif drone_pilot.command == "drone.movef":
-            drone.move_forward()
-        #pilot.autopilot.timer_stage = timer
-        print timer, pilot.autopilot.timer_stage, drone_pilot.command
-        #print str(drone_pilot.state), drone_pilot.command, timer, pilot.autopilot.timer_stage
-        #print states[lines - 1,:], timer, lines,states[0:lines-1, 2].sum()
 
+        if last_command == drone_pilot.command: #and timer % 1 < 0.1:
+            pass
+        else:
+            if drone_pilot.command == "drone.takeoff":
+                drone.takeoff()
+            elif drone_pilot.command == "drone.hover":
+                drone.hover()
+            elif drone_pilot.command == "drone.land":
+                drone.land()
+            elif drone_pilot.command == "drone.movef":
+                drone.move_forward()
+            elif drone_pilot.command == "drone.turnl":
+                drone.turn_left()
+            elif drone_pilot.command == "drone.movel":
+                drone.move_left()
+            elif drone_pilot.command == "drone.mover":
+                drone.move_right()
+            print "timer:", timer, "timer_stage:", pilot.autopilot.timer_stage, "command:", drone_pilot.command
+
+
+        #***********************************************************
         
            
                                                                                    
@@ -335,7 +376,7 @@ def main():
     #MK_closing sockets and threads
     nav_data.terminate()
     video_data.terminate()
-    time.sleep(1)
+    time.sleep(0.1)
     cap.release()
     nav_socket.close()
     print "Shutting down...",

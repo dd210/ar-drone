@@ -11,16 +11,17 @@ import array
 class Frame_processing(object):
 
       CROSS_COLOR = 255 # BLACK CROSS
-      PERIMETER_DEVIATION = 0.004
+      PERIMETER_DEVIATION = 0.005
       MIN_CROSS_AREA = 0.0005
-      MAX_CROSS_AREA = 0.2
-      MAX_ANGLE_NUMB = 23
+      MAX_CROSS_AREA = 0.1
+      MAX_ANGLE_NUMB = 20
       MIN_ANGLE_NUMB = 8
       MAX_AREA_PERIMETER_RATIO = 10
       MIN_CONTAREA_HULLAREA_RATIO = 3
-      ANGLE_RESOLUTION = 5
+      ANGLE_RESOLUTION = 10
 
       def __init__(self, curr_img):
+          
           self.__img = curr_img
           self.__height, self.__width, self.__depth = self.__img.shape
           self.__img_gray = cv2.cvtColor(self.__img, cv2.COLOR_RGB2GRAY)
@@ -29,8 +30,8 @@ class Frame_processing(object):
 #          plt.imshow(self.__img_gray_equ), plt.show()
 #          self.__img_gray_filt = cv2.inRange(self.__img_gray, 0, 175)
 #          plt.imshow(self.__img_gray_filt), plt.show()
-          self.__point_centre = [0, 0]
-          self.final_point_centre = [0, 0]
+          self.__point_centre = [self.__height/2, self.__width/2]
+          self.final_point_centre = [self.__height/2, self.__width/2]
           self.__point_length = []
           self.__angle_groups = []
           for i in range(0, 360/self.ANGLE_RESOLUTION):
@@ -106,7 +107,9 @@ class Frame_processing(object):
                 self.final_point_centre = self.__point_centre
 #          plt.imshow(self.blank), plt.show()
 #          plt.imshow(self.blank2), plt.show()
-          return self.cross_detected, self.final_point_centre, self.blank2
+          cv2.imwrite("image_cross.jpg", self.blank2)
+          #print self.final_point_centre
+          return self.cross_detected, self.final_point_centre #, self.blank2
 
       def point_centre_detector(self, approxCurve):
           self.__point_centre = [0, 0]

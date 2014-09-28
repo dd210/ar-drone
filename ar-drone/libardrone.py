@@ -9,6 +9,7 @@ import struct
 import sys
 import threading
 import time
+import numpy as np
 
 __author__ = ".."
 
@@ -41,12 +42,12 @@ class ARDrone(object):
       MP4_360P_H264_360P_CODEC = 0x88,
     """
 
-    def __init__(self):     
+    def __init__(self, img_init):     
         self.seq_nr = 1
-        self.timer_t = 0.2
+        self.timer_t = 0.1
         self.com_watchdog_timer = threading.Timer(self.timer_t, self.commwdg)
         self.lock = threading.Lock()
-        self.speed = 0.1
+        self.speed = 0.075
         time.sleep(0.1)
         self.config_ids_string = [SESSION_ID, USER_ID, APP_ID]
         self.configure_multisession(SESSION_ID, USER_ID, APP_ID, self.config_ids_string)
@@ -80,6 +81,9 @@ class ARDrone(object):
         self.altitude = 1.0
         self.angle = 0
         self.way = 0
+        #for croc
+        self.image = img_init
+        self.data_cross = [0,[640,400]]
         
     def takeoff(self):
         """Make the drone takeoff."""
