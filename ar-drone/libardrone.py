@@ -47,7 +47,7 @@ class ARDrone(object):
         self.timer_t = 0.1
         self.com_watchdog_timer = threading.Timer(self.timer_t, self.commwdg)
         self.lock = threading.Lock()
-        self.speed = 0.075
+        self.speed = 0.1
         time.sleep(0.1)
         self.config_ids_string = [SESSION_ID, USER_ID, APP_ID]
         self.configure_multisession(SESSION_ID, USER_ID, APP_ID, self.config_ids_string)

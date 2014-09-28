@@ -11,14 +11,14 @@ import array
 class Frame_processing(object):
 
       CROSS_COLOR = 255 # BLACK CROSS
-      PERIMETER_DEVIATION = 0.005
+      PERIMETER_DEVIATION = 0.0075
       MIN_CROSS_AREA = 0.0005
       MAX_CROSS_AREA = 0.1
       MAX_ANGLE_NUMB = 20
       MIN_ANGLE_NUMB = 8
       MAX_AREA_PERIMETER_RATIO = 10
       MIN_CONTAREA_HULLAREA_RATIO = 3
-      ANGLE_RESOLUTION = 10
+      ANGLE_RESOLUTION = 5
 
       def __init__(self, curr_img):
           
@@ -40,9 +40,9 @@ class Frame_processing(object):
 
       def cross_detection(self):
           self.cross_detected = 0
-          self.__img_thresh = cv2.threshold(self.__img_gray, 125, self.CROSS_COLOR, cv2.THRESH_OTSU)[1]
+          self.__img_thresh = cv2.threshold(self.__img_gray, 150, self.CROSS_COLOR, cv2.THRESH_OTSU)[1]
           self.__img_thresh = 255 - self.__img_thresh
-#          cv2.imwrite('thresh.png', self.__img_thresh)
+          cv2.imwrite('thresh.jpg', self.__img_thresh)
           self.__contours, self.__hierarchy = cv2.findContours(self.__img_thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
           self.blank = np.zeros((self.__height, self.__width, 3), np.uint8)
           self.blank2 = np.zeros((self.__height, self.__width, 3), np.uint8)
@@ -105,8 +105,8 @@ class Frame_processing(object):
                 cv2.drawContours( self.blank2, [__hull], -1, (255, 0, 0), 2)
                 self.cross_detected = 1
                 self.final_point_centre = self.__point_centre
-#          plt.imshow(self.blank), plt.show()
-#          plt.imshow(self.blank2), plt.show()
+           #plt.imshow(self.blank), plt.show()
+           #plt.imshow(self.blank2), plt.show()
           cv2.imwrite("image_cross.jpg", self.blank2)
           #print self.final_point_centre
           return self.cross_detected, self.final_point_centre #, self.blank2

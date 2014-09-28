@@ -43,6 +43,7 @@ class reading_nav_data:
     def decode(self, q_nav, frame, s, time1, time2, cross_program, frame_cross_counter, cross_state):
         #MK_default nav data
         #cross_state = [False, [0,0]]
+        state = False
         cross_past_states = []
         cross_past_states_x = []
         cross_past_states_y = []
@@ -58,7 +59,9 @@ class reading_nav_data:
         str_theta = "theta: " + str("")
         str_cross = "cross identification: " + str("")
         str_frames = "frame_cross_counter: " + str("")
+        nav_info = []
         if q_nav.full():
+            state = True
             nav_info = q_nav.get()
             nav_info = libardrone.decode_navdata(nav_info)
             try:
@@ -69,8 +72,7 @@ class reading_nav_data:
                 vz_state = 0.001 * nav_info[0]['vz']
                 phi_state = nav_info[0]['phi']
                 psi_state = nav_info[0]['psi']
-                theta_state = nav_info[0]['theta']
-                s = s + (((time2 - time1)*vx_state)**2 + ((time2 - time1)*vy_state)**2)**0.5
+                theta_state = nav_info[0]['theta']                
                 #MK_printing navigation state                                        
                 str_battery = "battery level: " + str(battery_state)
                 str_altitude = "altitude: " + str(altitude_state)        
@@ -100,7 +102,7 @@ class reading_nav_data:
         cv2.putText(frame,str(str_frames),(20,240), cv2.FONT_HERSHEY_PLAIN, 1.0,(0,255,0))  
         #print cross_state[1][0],cross_state[1][1]             
         cv2.circle(frame, (cross_state[1][0], cross_state[1][1]), 10, (255, 0, 0), -1)  
-        return frame, s
+        return frame, nav_info, state
 
 #MK_class for reading video data
 class reading_video_data:
@@ -135,6 +137,7 @@ class reading_video_data:
             frame = q_vid.get() 
             frame_0 = frame.copy()
             frame_1 = frame.copy() 
+            #print timer - time_vid_proc_1
             if timer - time_vid_proc_1 > 0.5:
                 video_processing_time = timer - time_vid_proc_1
                 print "delay in video processing:", video_processing_time, "; number of frame:", frame_counter, "; time:", timer
@@ -194,8 +197,8 @@ def main():
     #MK_sending msg to the Drone in order to start receive messages
     nav_socket.sendto("\x01\x00\x00\x00", ('192.168.1.1', 5554))
     #MK_creating queue for threads (nav and video)
-    q_nav = Queue.Queue(1)
-    q_vid = Queue.Queue(1)
+    q_nav = Queue.Queue(2)
+    q_vid = Queue.Queue(2)
     #MK_creating threads
     nav_data = reading_nav_data()
     video_data = reading_video_data()
@@ -206,8 +209,8 @@ def main():
     video_thread.start()
     time.sleep(0.001)       
     #MK_cross - creating queue
-    q_cross_out = Queue.Queue(1)
-    q_cross_in = Queue.Queue(1)
+    q_cross_out = Queue.Queue(2)
+    q_cross_in = Queue.Queue(2)
     cross_data = reading_cross_data()
     cross_thread = threading.Thread(target = cross_data.run, args = (q_cross_in, q_cross_out, drone))
     cross_thread.start()     
@@ -226,6 +229,8 @@ def main():
     frame = np.zeros((H, W, 3), np.uint8)
     frame_0 = np.zeros((H, W, 3), np.uint8)
     frame_1 = np.zeros((H, W, 3), np.uint8)
+    vx_state = 0.0
+    vy_state = 0.0
     states = np.array([(pilot.autopilot.number, pilot.autopilot.s_stage, pilot.autopilot.timer_stage)])
     #creating pilot
     drone_pilot = pilot.autopilot()
@@ -237,8 +242,15 @@ def main():
         frame, frame_0, frame_1, time_vid_proc_1, state  = video_data.decode(q_vid, frame, frame_0, frame_1, frame_counter, timer, time_vid_proc_1)            
         #MK_reading navigation data from queue and calculating integrated trajectory
         time2 = time.clock()
-        frame, s = nav_data.decode(q_nav, frame, s, time1, time2, cross_program, frame_cross_counter, drone.data_cross)  
-        #print "cross", drone.data_cross
+        frame, nav_info, state = nav_data.decode(q_nav, frame, s, time1, time2, cross_program, frame_cross_counter, drone.data_cross)  
+        if state == True:
+            try:
+                vx_state = 0.001 * nav_info[0]['vx']
+                vy_state = 0.001 * nav_info[0]['vy']  
+            except KeyError:
+                continue                      
+        s = s + (((time2 - time1)*vx_state)**2 + ((time2 - time1)*vy_state)**2)**0.5
+        #print s
         time1 = time.clock()      
         #decoding image to pygame format and putting captured frame on the screen and update (that's two consequent actions)                              
         pygame_img = video_data.cvimage_to_pygame(frame)
@@ -250,7 +262,7 @@ def main():
 
 
         #*********************AUTOPILOT PART************************
-        freq = 5
+        freq = 2
         if frame_counter % freq == 0 and state == True:
             q_cross_in.put(frame_1) 
 
@@ -285,6 +297,8 @@ def main():
                 drone.move_forward()
             elif drone_pilot.command == "drone.turnl":
                 drone.turn_left()
+            elif drone_pilot.command == "drone.turnr":
+                drone.turn_right()
             elif drone_pilot.command == "drone.movel":
                 drone.move_left()
             elif drone_pilot.command == "drone.mover":

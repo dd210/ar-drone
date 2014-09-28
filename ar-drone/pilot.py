@@ -8,6 +8,7 @@ class autopilot:
     timer_stage = 0.0
     s_stage = 0.0
     number = 0
+    cross = 0
 
     lock_timer = 0.0
     lock_state = False
@@ -38,18 +39,19 @@ class autopilot:
     #specific program of the flight
 
     def wait(self, drone):
-        if autopilot.timer_stage > 500000.0:
+        if autopilot.timer_stage > 5.0:
             self.command = "drone.takeoff"
             self.state = self.hover1
 
     def hover1(self, drone):
         self.command = "drone.hover"
         if autopilot.timer_stage > 6.0:
-            self.state = self.search_cross
+            self.state = self.move_forward
 
-    """def move_forward(self, drone):
+    def move_forward(self, drone):
         self.command = "drone.movef"
-        if autopilot.timer_stage > 1.5:
+        print autopilot.s_stage
+        if autopilot.s_stage > 2.0:
             self.state = self.hover2
 
     def hover2(self, drone):
@@ -59,7 +61,7 @@ class autopilot:
         
     def turn_left(self, drone):
         self.command = "drone.turnl"  
-        if autopilot.timer_stage >= 3.1:               
+        if autopilot.timer_stage >= 7.5:               
             self.state = self.hover3
 
     def hover3(self, drone):
@@ -69,7 +71,7 @@ class autopilot:
 
     def turn_left2(self, drone):
         self.command = "drone.turnl"  
-        if autopilot.timer_stage >= 3.1:               
+        if autopilot.timer_stage >= 7.5:               
             self.state = self.hover4
 
     def hover4(self, drone):
@@ -85,7 +87,7 @@ class autopilot:
     def hover5(self, drone):
         self.command = "drone.hover"
         if autopilot.timer_stage > 2.0:
-            self.state = self.search_cross"""
+            self.state = self.search_cross
 
     def search_cross(self, drone):
         self.command = "drone.hover"
@@ -99,22 +101,28 @@ class autopilot:
 
         if (coord_x - W/2.0) <= -threshold:
             self.command = "drone.movel"
+            autopilot.cross = 0
         elif (coord_x - W/2.0) >= threshold:
             self.command = "drone.mover"
+            autopilot.cross = 0
         elif abs(coord_x - W/2.0) < threshold and drone.data_cross[0] == 1:
-            self.command = "drone.hover"
-            self.state = self.search_cross2
+            autopilot.cross = autopilot.cross + 1
+            if autopilot.cross == 2:
+             self.command = "drone.hover"
+             self.state = self.search_cross2
 
     def search_cross2(self, drone):
+        print '123456789'
         self.command = "drone.hover"
-        print autopilot.s_stage
+        #print autopilot.s_stage
         if autopilot.timer_stage > 4.0:
             self.command = "drone.movef"
-            if autopilot.s_stage > 1.0:
-                self.state = self.landing
+        if autopilot.timer_stage > 8.0:
+            self.state = self.landing
 
 
-
+    def landing(self, drone):
+        self.command = "drone.land"
 
 
 
